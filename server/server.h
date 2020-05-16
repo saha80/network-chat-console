@@ -16,11 +16,10 @@ public:
 	}
 	void server_loop()
 	{
-		auto running = true;
 		char buf[4096];
-		const auto welcome_msg = "Welcome to the Awesome Chat Server!\r\n";
-		const auto disconnect_cmd = "\\disconnect/";
-		while (running)
+		const std::string disconnect_cmd("\\disconnect/");
+		std::cout << "server has started" << std::endl;
+		while (true)
 		{
 			auto master_copy = master_; // select is destructive
 			const auto socket_count = select(0, &master_copy, nullptr, nullptr, nullptr);
@@ -35,9 +34,9 @@ public:
 					if (nick_name.empty()) {
 						nick_name = "CS" + std::to_string(new_client);
 					}
+					std::cout << nick_name << std::endl;
 					clients_.insert({ new_client, nick_name });
-					send_to_all(nick_name + " has joined!");
-					//send(new_client, welcome_msg, int(strlen(welcome_msg)) + 1, 0);
+					send_to_all(nick_name + " has joined!\n");
 				}
 				else {
 					ZeroMemory(buf, sizeof(buf));
@@ -48,21 +47,18 @@ public:
 						std::cerr << "Client sock #" << sock
 							<< " has been dropped, E" << WSAGetLastError() << std::endl;
 					}
+					if (bytes_received == 0) {
+						disconnect_client(sock);
+					}
 					else {
 						if (buf[0] == '\\') {
-							auto cmd = std::string(buf, bytes_received);
-							if (cmd == disconnect_cmd) {
-								closesocket(sock);
-								FD_CLR(sock, &master_);
-								std::ostringstream oss;
-								oss << "Client sock #" << sock << " has been disconnect" << std::endl;
-								send_to_all(oss.str());
+							if (std::string(buf) == disconnect_cmd) {
+								disconnect_client(sock);
+								continue;
 							}
 						}
 						std::ostringstream oss;
-						//oss << 
-						//oss << "SOCKET #" << sock << ": " << buf << "\r\n";
-						oss << "<" << clients_.find(sock)->second << ">: " << buf << "\r\n";
+						oss << "<" << clients_.find(sock)->second << ">: " << buf << "\n";
 						send_to_all(oss.str());
 					}
 				}
@@ -113,6 +109,15 @@ private:
 				send(master_.fd_array[i], msg.c_str(), int(msg.size()) + 1, 0);
 			}
 		}
+	}
+	void disconnect_client(const SOCKET sock)
+	{
+		const auto client = clients_.find(sock);
+		const auto client_nick = client->second;
+		send_to_all(client_nick + " has left\n");
+		closesocket(sock);
+		FD_CLR(sock, &master_);
+		clients_.erase(client);
 	}
 	//void send_to_all(const std::string &msg, const SOCKET except)
 	//{
