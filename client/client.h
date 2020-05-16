@@ -32,13 +32,13 @@ public:
 	{
 		return pipe_;
 	}
-	HANDLE get_server_can_enter() const
+	HANDLE get_client_output_received_msg() const
 	{
-		return server_can_enter;
+		return client_output_received_msg;
 	}
-	HANDLE get_client_can_print() const
+	HANDLE get_wait_for_output() const
 	{
-		return client_can_print;
+		return wait_for_output;
 	}
 	~client()
 	{
@@ -95,8 +95,8 @@ private:
 		}
 		const auto pipe_name = R"(\\.\pipe\output_console)";
 		pipe_ = CreateNamedPipeA(pipe_name, PIPE_ACCESS_DUPLEX, PIPE_TYPE_BYTE, 2, BUFSIZ, BUFSIZ, 0, nullptr);
-		server_can_enter = CreateSemaphoreA(nullptr, 1, 1, "_pipe_server_can_enter_event_");
-		client_can_print = CreateSemaphoreA(nullptr, 0, 1, "_pipe_client_can_print_event_");
+		client_output_received_msg = CreateSemaphoreA(nullptr, 1, 1, "client_output_received_msg");
+		wait_for_output = CreateSemaphoreA(nullptr, 0, 1, "wait_for_output");
 		if (pipe_ == INVALID_HANDLE_VALUE) {
 			closesocket(sock_);
 			WSACleanup();
@@ -112,8 +112,8 @@ private:
 	std::string ip_address_;
 	int port_;
 	char read_buf_[4096];
-	HANDLE server_can_enter;
-	HANDLE client_can_print;
+	HANDLE client_output_received_msg;
+	HANDLE wait_for_output;
 	BOOL   fConnected = FALSE;
 	HANDLE pipe_ = INVALID_HANDLE_VALUE;
 };

@@ -23,6 +23,10 @@ public:
 		{
 			auto master_copy = master_; // select is destructive
 			const auto socket_count = select(0, &master_copy, nullptr, nullptr, nullptr);
+			if (socket_count == SOCKET_ERROR) {
+				const auto msg = "WSAGetLastError = " + std::to_string(WSAGetLastError());
+				throw std::exception(msg.c_str());
+			}
 			for (auto i = 0; i < socket_count; ++i) {
 				const auto sock = master_copy.fd_array[i];
 				if (sock == listening_) {

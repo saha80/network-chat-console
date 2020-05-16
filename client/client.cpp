@@ -51,10 +51,10 @@ void output_to_another_console(client &c)
 	char write_buf[BUFSIZ];
 	while (true)
 	{
-		WaitForSingleObject(c.get_server_can_enter(), INFINITE);
+		WaitForSingleObject(c.get_client_output_received_msg(), INFINITE);
 		const auto received = c.receive();
 		if (received.empty()) {
-			ReleaseSemaphore(c.get_server_can_enter(), 1, nullptr);
+			ReleaseSemaphore(c.get_client_output_received_msg(), 1, nullptr);
 			continue;
 		}
 		strcpy_s(write_buf, BUFSIZ, received.c_str());
@@ -63,7 +63,7 @@ void output_to_another_console(client &c)
 			std::cerr << GetLastError() << std::endl;
 			break;
 		}
-		ReleaseSemaphore(c.get_client_can_print(), 1, nullptr);
+		ReleaseSemaphore(c.get_wait_for_output(), 1, nullptr);
 	}
 	FlushFileBuffers(c.get_pipe());
 	DisconnectNamedPipe(c.get_pipe());

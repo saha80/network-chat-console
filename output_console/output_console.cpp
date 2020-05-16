@@ -14,15 +14,15 @@ int main()
 		system("pause");
 		return EXIT_FAILURE;
 	}
-	auto server_can_enter = OpenSemaphoreA(SEMAPHORE_ALL_ACCESS, false, "_pipe_server_can_enter_event_");
-	auto client_can_print = OpenSemaphoreA(SEMAPHORE_ALL_ACCESS, false, "_pipe_client_can_print_event_");
-	if (!server_can_enter || !client_can_print) {
+	auto client_output_received_msg = OpenSemaphoreA(SEMAPHORE_ALL_ACCESS, false, "client_output_received_msg");
+	auto wait_for_output = OpenSemaphoreA(SEMAPHORE_ALL_ACCESS, false, "wait_for_output");
+	if (!client_output_received_msg || !wait_for_output) {
 		std::cerr << "OpenSemaphoreA failed, GetLastError = " << GetLastError() << std::endl;
 		system("pause");
 		return EXIT_FAILURE;
 	}
 	while (true) {
-		WaitForSingleObject(client_can_print, INFINITE);
+		WaitForSingleObject(wait_for_output, INFINITE);
 		ZeroMemory(buf, BUFSIZ);
 		DWORD  read;
 		if (!ReadFile(pipe, buf, BUFSIZ, &read, nullptr)) {
@@ -30,11 +30,11 @@ int main()
 			break;
 		}
 		std::cout << buf;
-		ReleaseSemaphore(server_can_enter, 1, nullptr);
+		ReleaseSemaphore(client_output_received_msg, 1, nullptr);
 	}
 	CloseHandle(pipe);
-	CloseHandle(client_can_print);
-	CloseHandle(server_can_enter);
+	CloseHandle(wait_for_output);
+	CloseHandle(client_output_received_msg);
 	return 0;
 }
 #endif
