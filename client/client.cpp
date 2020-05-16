@@ -20,7 +20,7 @@ int main(int argc, char** argv)
 			std::cout << "Invalid port" << std::endl;
 			return 0;
 		}
-		client client(argv[0], argv[1], std::stoi(argv[2]), argv[3]);
+		client client(argv[0], argv[1], std::stoi(argv[2]));
 		client.send(argv[3]);
 		std::thread thread(output_to_another_console, std::ref(client));
 		std::string user_input;

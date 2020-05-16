@@ -7,9 +7,8 @@
 class client
 {
 public:
-	client() = default;
-	client(const std::string &path, std::string ip, const u_short port, std::string nick)
-		: ip_address_(std::move(ip)), port_(port), nick_name_(std::move(nick))
+	client(const std::string &path, std::string ip, const u_short port)
+		: ip_address_(std::move(ip)), port_(port)
 	{
 		setup_client();
 		setup_output(path);
@@ -22,12 +21,12 @@ public:
 	}
 	std::string receive()
 	{
-		ZeroMemory(buf_, sizeof(buf_));
-		const auto received_bytes = recv(sock_, buf_, sizeof(buf_), 0);
+		ZeroMemory(read_buf_, sizeof(read_buf_));
+		const auto received_bytes = recv(sock_, read_buf_, sizeof(read_buf_), 0);
 		if (received_bytes == SOCKET_ERROR) {
 			throw std::exception("SOCKET_ERROR");
 		}
-		return std::string(buf_, 0, received_bytes);
+		return std::string(read_buf_, 0, received_bytes);
 	}
 	HANDLE get_pipe() const
 	{
@@ -40,10 +39,6 @@ public:
 	HANDLE get_client_can_print() const
 	{
 		return client_can_print;
-	}
-	std::string get_nick_name() const
-	{
-		return nick_name_;
 	}
 	~client()
 	{
@@ -116,8 +111,7 @@ private:
 	sockaddr_in hint_;
 	std::string ip_address_;
 	int port_;
-	std::string nick_name_;
-	char buf_[4096];
+	char read_buf_[4096];
 	HANDLE server_can_enter;
 	HANDLE client_can_print;
 	BOOL   fConnected = FALSE;
