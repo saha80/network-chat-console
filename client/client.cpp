@@ -14,6 +14,11 @@ int main(int argc, char** argv)
 	}
 	try
 	{
+		const auto port = std::stoi(argv[2]);
+		if (port < 0) {
+			std::cout << "Invalid port" <<std::endl;
+			return 0;
+		}
 		client client(argv[0], argv[1], std::stoi(argv[2]), argv[3]);
 		client.send(argv[3]);
 		std::thread thread(output_to_another_console, std::ref(client));
