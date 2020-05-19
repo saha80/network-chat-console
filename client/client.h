@@ -1,56 +1,24 @@
 #pragma once
+#include <algorithm>
 #include <iostream>
 #include <string>
 #include <WS2tcpip.h>
+
+#include "output_console.h"
 #pragma comment(lib, "ws2_32.lib")
 
 class client
 {
 public:
-	client(const std::string &path, std::string ip, const u_short port)
-		: ip_address_(std::move(ip)), port_(port)
+	client(const std::string &path, std::string ip, const u_short port, std::string nick)
+		: ip_address_(std::move(ip)), port_(port), console_(path)
 	{
-		setup_client();
-		setup_output(path);
-	}
-	void send(const std::string& msg) const
-	{
-		if (::send(sock_, msg.c_str(), int(msg.size()) + 1, 0) == SOCKET_ERROR) {
-			throw std::exception("SOCKET_ERROR");
-		}
-	}
-	std::string receive()
-	{
-		ZeroMemory(read_buf_, sizeof(read_buf_));
-		const auto received_bytes = recv(sock_, read_buf_, sizeof(read_buf_), 0);
-		if (received_bytes == SOCKET_ERROR) {
-			throw std::exception("SOCKET_ERROR");
-		}
-		return std::string(read_buf_, 0, received_bytes);
-	}
-	HANDLE get_pipe() const
-	{
-		return pipe_;
-	}
-	HANDLE get_client_output_received_msg() const
-	{
-		return client_output_received_msg;
-	}
-	HANDLE get_wait_for_output() const
-	{
-		return wait_for_output;
-	}
-	~client()
-	{
-		closesocket(sock_);
-		WSACleanup();
-	}
-private:
-	void setup_client()
-	{
-		const auto result = WSAStartup(MAKEWORD(2, 2), &wsa_data_);
-		if (result != 0) {
-			throw std::logic_error("Can't start WinSock, error code: " + std::to_string(result));
+		nick.erase(std::remove_if(nick.begin(), nick.end(), [](const char &c) -> bool {
+			return !(c > 0x001F && c < 0x007F);
+		}), nick.end());
+		const auto WSA_res = WSAStartup(MAKEWORD(2, 2), &wsa_data_);
+		if (WSA_res != 0) {
+			throw std::logic_error("Can't start WinSock, error code: " + std::to_string(WSA_res));
 		}
 		sock_ = socket(AF_INET, SOCK_STREAM, 0);
 		if (sock_ == INVALID_SOCKET) {
@@ -76,44 +44,79 @@ private:
 			WSACleanup();
 			throw std::exception(msg.c_str());
 		}
+		send(nick);
 	}
-	void setup_output(std::string path)
+	void connect_to_server()
 	{
-		STARTUPINFO si{ sizeof(si) };
-		PROCESS_INFORMATION pi{};
-		while (!path.empty() && path.back() != '\\') {
-			path.pop_back();
-		}
-		const auto output_console = path + "output_console.exe";
-		if (!CreateProcessA(output_console.c_str(), nullptr, nullptr, nullptr, true,
-			CREATE_NEW_CONSOLE, nullptr, nullptr, &si, &pi))
+		DWORD id;
+		auto output_to_console_thread = CreateThread(nullptr, 0, output_to_another_console, (void*)this, 0, &id);
+		std::string user_input;
+		while (true)
 		{
-			const auto msg = "CreateProcess wailed, E" + std::to_string(GetLastError());
-			closesocket(sock_);
-			WSACleanup();
-			throw std::exception(msg.c_str());
+			std::cout << ">";
+			std::getline(std::cin, user_input);
+			if (user_input == "\\disconnect/") {
+				send(user_input);
+				TerminateThread(output_to_console_thread, EXIT_SUCCESS);
+				CloseHandle(output_to_console_thread);
+				break;
+			}
+			if (!user_input.empty()) {
+				send(user_input);
+			}
+			system("cls");
 		}
-		const auto pipe_name = R"(\\.\pipe\output_console)";
-		pipe_ = CreateNamedPipeA(pipe_name, PIPE_ACCESS_DUPLEX, PIPE_TYPE_BYTE, 2, BUFSIZ, BUFSIZ, 0, nullptr);
-		client_output_received_msg = CreateSemaphoreA(nullptr, 1, 1, "client_output_received_msg");
-		wait_for_output = CreateSemaphoreA(nullptr, 0, 1, "wait_for_output");
-		if (pipe_ == INVALID_HANDLE_VALUE) {
-			closesocket(sock_);
-			WSACleanup();
-			const auto msg = "CreateNamedPipe failed, E" + std::to_string(GetLastError());
-			throw std::exception(msg.c_str());
+	}
+	~client()
+	{
+		closesocket(sock_);
+		WSACleanup();
+	}
+private:
+	void send(const std::string& msg) const
+	{
+		if (::send(sock_, msg.c_str(), int(msg.size()) + 1, 0) == SOCKET_ERROR) {
+			throw std::exception("Server has been disconnected");
 		}
-		fConnected = ConnectNamedPipe(pipe_, nullptr) ? TRUE : GetLastError() == ERROR_PIPE_CONNECTED;
+	}
+	std::string receive() const
+	{
+		char read_buf[4096]{};
+		const auto received_bytes = recv(sock_, read_buf, sizeof(read_buf), 0);
+		if (received_bytes == SOCKET_ERROR) {
+			throw std::exception("Server has been disconnected");
+		}
+		return std::string(read_buf, 0, received_bytes);
+	}
+	static DWORD WINAPI output_to_another_console(void* p)
+	{
+		auto c = (client*)p;
+		std::string received;
+		while (true)
+		{
+			c->console_.wait_output_received_msg();
+			try {
+				received = c->receive();
+			}
+			catch (std::exception &e) {
+				c->console_.write_to_console(e.what());
+				c->console_.release_wait_for_output();
+				return 1;
+			}
+			if (received.empty()) {
+				c->console_.release_output_received_msg();
+				continue;
+			}
+			c->console_.write_to_console(received);
+			c->console_.release_wait_for_output();
+		}
 	}
 private:
 	WSADATA wsa_data_;
 	SOCKET sock_;
 	sockaddr_in hint_;
 	std::string ip_address_;
-	int port_;
-	char read_buf_[4096];
-	HANDLE client_output_received_msg;
-	HANDLE wait_for_output;
-	BOOL   fConnected = FALSE;
-	HANDLE pipe_ = INVALID_HANDLE_VALUE;
+	u_short port_;
+
+	output_console console_;
 };

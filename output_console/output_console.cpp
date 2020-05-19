@@ -24,7 +24,7 @@ int main()
 	while (true) {
 		WaitForSingleObject(wait_for_output, INFINITE);
 		ZeroMemory(buf, BUFSIZ);
-		DWORD  read;
+		DWORD read;
 		if (!ReadFile(pipe, buf, BUFSIZ, &read, nullptr)) {
 			std::cerr << "ReadFile failed, GetLastError = " << GetLastError() << std::endl;
 			break;

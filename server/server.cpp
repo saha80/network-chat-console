@@ -9,7 +9,7 @@ int main(int argc, char **argv)
 	}
 	try {
 		server server(std::stoi(argv[1]));
-		server.server_loop();
+		server.wait_for_connections();
 	}
 	catch (std::exception &e) {
 		std::cerr << e.what() << std::endl;

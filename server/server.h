@@ -3,7 +3,7 @@
 #include <sstream>
 #include <conio.h>
 #include <map>
-#include <windows.h>
+#include <WS2tcpip.h>
 #pragma comment(lib, "ws2_32.lib")
 
 class server
@@ -11,17 +11,34 @@ class server
 public:
 	server(const u_short port) : port_(port)
 	{
-		initialize_win_sock();
-		setup_listening_socket();
+		// initialize_win_sock
+		const auto result = WSAStartup(MAKEWORD(2, 2), &wsa_data_);
+		if (result != 0) {
+			throw std::logic_error("Can't start WinSock, Err #" + std::to_string(result));
+		}
+		// setup_listening_socket
+		listening_ = socket(AF_INET, SOCK_STREAM, 0);
+		if (listening_ == INVALID_SOCKET) {
+			const auto msg = "Can't create socket, WSAData error code: " + std::to_string(WSAGetLastError());
+			WSACleanup();
+			throw std::logic_error(msg);
+		}
+		hint_.sin_family = AF_INET;
+		hint_.sin_port = htons(port_);
+		hint_.sin_addr.S_un.S_addr = INADDR_ANY;
+		bind(listening_, reinterpret_cast<sockaddr*>(&hint_), sizeof(hint_));
+		listen(listening_, SOMAXCONN);
+		FD_ZERO(&master_);
+		FD_SET(listening_, &master_);
 	}
-	void server_loop()
+	void wait_for_connections()
 	{
 		char buf[4096];
 		const std::string disconnect_cmd("\\disconnect/");
 		std::cout << "server has started" << std::endl;
 		while (true)
 		{
-			auto master_copy = master_; // select is destructive
+			auto master_copy = master_;
 			const auto socket_count = select(0, &master_copy, nullptr, nullptr, nullptr);
 			if (socket_count == SOCKET_ERROR) {
 				const auto msg = "WSAGetLastError = " + std::to_string(WSAGetLastError());
@@ -38,9 +55,10 @@ public:
 					if (nick_name.empty()) {
 						nick_name = "CS" + std::to_string(new_client);
 					}
-					std::cout << nick_name << std::endl;
+					const auto msg = nick_name + " has joined!\n";
+					std::cout << msg;
 					clients_.insert({ new_client, nick_name });
-					send_to_all(nick_name + " has joined!\n");
+					send_to_all(msg);
 				}
 				else {
 					ZeroMemory(buf, sizeof(buf));
@@ -83,32 +101,9 @@ public:
 		WSACleanup();
 	}
 private:
-	void initialize_win_sock()
+	void send_to_all(const std::string &msg) const
 	{
-		const auto result = WSAStartup(MAKEWORD(2, 2), &wsa_data_);
-		if (result != 0) {
-			throw std::logic_error("Can't start WinSock, Err #" + std::to_string(result));
-		}
-	}
-	void setup_listening_socket()
-	{
-		listening_ = socket(AF_INET, SOCK_STREAM, 0);
-		if (listening_ == INVALID_SOCKET) {
-			const auto msg = "Can't create socket, WSAData error code: " + std::to_string(WSAGetLastError());
-			WSACleanup();
-			throw std::logic_error(msg);
-		}
-		hint_.sin_family = AF_INET;
-		hint_.sin_port = htons(port_);
-		hint_.sin_addr.S_un.S_addr = INADDR_ANY;
-		bind(listening_, reinterpret_cast<sockaddr*>(&hint_), sizeof(hint_));
-		listen(listening_, SOMAXCONN);
-		FD_ZERO(&master_);
-		FD_SET(listening_, &master_);
-	}
-	void send_to_all(const std::string &msg)
-	{
-		for (u_int i = 0; i < master_.fd_count; ++i) {
+		for (int i = 0; i < master_.fd_count; ++i) {
 			if (master_.fd_array[i] != listening_) {
 				send(master_.fd_array[i], msg.c_str(), int(msg.size()) + 1, 0);
 			}
@@ -117,20 +112,13 @@ private:
 	void disconnect_client(const SOCKET sock)
 	{
 		const auto client = clients_.find(sock);
-		const auto client_nick = client->second;
-		send_to_all(client_nick + " has left\n");
+		const auto disconnect_msg = client->second + " has left\n";
+		send_to_all(disconnect_msg);
 		closesocket(sock);
 		FD_CLR(sock, &master_);
 		clients_.erase(client);
+		std::cout << disconnect_msg;
 	}
-	//void send_to_all(const std::string &msg, const SOCKET except)
-	//{
-	//	for (u_int i = 0; i < master_.fd_count; ++i) {
-	//		if (master_.fd_array[i] != listening_ && master_.fd_array[i] != except) {
-	//			send(master_.fd_array[i], msg.c_str(), (int)msg.size() + 1, 0);
-	//		}
-	//	}
-	//}
 private:
 	WSADATA wsa_data_;
 	SOCKET listening_;
