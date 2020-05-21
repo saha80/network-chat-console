@@ -6,7 +6,7 @@ class output_console
 {
 public:
 	explicit output_console(std::string path)
-	{
+		{
 		STARTUPINFO si{ sizeof(si) };
 		PROCESS_INFORMATION pi{};
 		while (!path.empty() && path.back() != '\\') {

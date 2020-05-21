@@ -14,11 +14,11 @@ int main(int argc, char** argv)
 	try
 	{
 		const auto port = std::stoi(argv[2]);
-		if (port < 0) {
+		if (port < 0 || port > UINT16_MAX) {
 			std::cout << "Invalid port" << std::endl;
 			return 0;
 		}
-		client client(argv[0], argv[1], std::stoi(argv[2]), argv[3]);
+		client client(argv[0], argv[1], port, argv[3]);
 		client.connect_to_server();
 	}
 	catch (std::exception &e) {

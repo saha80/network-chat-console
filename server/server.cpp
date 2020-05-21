@@ -8,7 +8,12 @@ int main(int argc, char **argv)
 		return 0;
 	}
 	try {
-		server server(std::stoi(argv[1]));
+		const auto port = std::stoi(argv[1]);
+		if (port < 0 || port > UINT16_MAX) {
+			std::cout << "Invalid port" << std::endl;
+			return 0;
+		}
+		server server(port);
 		server.wait_for_connections();
 	}
 	catch (std::exception &e) {

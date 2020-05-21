@@ -1,6 +1,7 @@
 #pragma once
 #include <algorithm>
 #include <iostream>
+#include <regex>
 #include <string>
 #include <WS2tcpip.h>
 
@@ -55,6 +56,7 @@ public:
 		{
 			std::cout << ">";
 			std::getline(std::cin, user_input);
+			format_user_input(user_input);
 			if (user_input == "\\disconnect/") {
 				send(user_input);
 				TerminateThread(output_to_console_thread, EXIT_SUCCESS);
@@ -87,6 +89,17 @@ private:
 			throw std::exception("Server has been disconnected");
 		}
 		return std::string(read_buf, 0, received_bytes);
+	}
+	static void format_user_input(std::string &s)
+	{
+		std::replace(s.begin(), s.end(), '\t', ' ');
+		s = std::regex_replace(s, std::regex("\\s{2,}"), " ");
+		if (!s.empty() && s.front() == ' ') {
+			s.erase(s.begin());
+		}
+		if (!s.empty() && s.back() == ' ') {
+			s.pop_back();
+		}
 	}
 	static DWORD WINAPI output_to_another_console(void* p)
 	{

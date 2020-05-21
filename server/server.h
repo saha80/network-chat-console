@@ -103,7 +103,7 @@ public:
 private:
 	void send_to_all(const std::string &msg) const
 	{
-		for (int i = 0; i < master_.fd_count; ++i) {
+		for (u_int i = 0; i < master_.fd_count; ++i) {
 			if (master_.fd_array[i] != listening_) {
 				send(master_.fd_array[i], msg.c_str(), int(msg.size()) + 1, 0);
 			}
