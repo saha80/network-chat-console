@@ -6,14 +6,14 @@ class output_console
 {
 public:
 	explicit output_console(std::string path)
-		{
+	{
 		STARTUPINFO si{ sizeof(si) };
 		PROCESS_INFORMATION pi{};
 		while (!path.empty() && path.back() != '\\') {
 			path.pop_back();
 		}
-		const auto output_console_path = (path + "output_console.exe").c_str();
-		if (!CreateProcessA(output_console_path, nullptr, nullptr, nullptr,
+		const auto output_console_path = path + "output_console.exe";
+		if (!CreateProcessA(output_console_path.c_str(), nullptr, nullptr, nullptr,
 			TRUE, CREATE_NEW_CONSOLE, nullptr, nullptr, &si, &pi))
 		{
 			const auto msg = "CreateProcess wailed, E" + std::to_string(GetLastError());
