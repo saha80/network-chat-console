@@ -83,7 +83,7 @@ private:
 	}
 	std::string receive() const
 	{
-		char read_buf[4096]{};
+		char read_buf[BUFSIZ]{};
 		const auto received_bytes = recv(sock_, read_buf, sizeof(read_buf), 0);
 		if (received_bytes == SOCKET_ERROR) {
 			throw std::exception("Server has been disconnected");
